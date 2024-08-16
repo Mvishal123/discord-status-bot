@@ -1,9 +1,9 @@
 import cors from "cors";
-import { Client, GatewayIntentBits, User } from "discord.js";
+import { Client, GatewayIntentBits } from "discord.js";
 import dotenv from "dotenv";
 import express from "express";
-import { WebSocket, WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
+import { WebSocket, WebSocketServer } from "ws";
 
 const app = express();
 dotenv.config();
@@ -12,9 +12,9 @@ app.use(cors());
 type UserDetails = {
   ws: WebSocket;
   message: String[];
-}
+};
 
-const activeUsers: Record<string, UserDetails> = {}
+const activeUsers: Record<string, UserDetails> = {};
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildPresences],
@@ -79,8 +79,4 @@ wss.on("connection", (ws: WebSocket, req) => {
   console.log({ uuid });
 
   handleDiscordOnConnection(ws);
-});
-
-app.listen(3001, () => {
-  console.log("Server is running on port 3001");
 });

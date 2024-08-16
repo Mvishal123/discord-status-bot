@@ -16,11 +16,12 @@ const cors_1 = __importDefault(require("cors"));
 const discord_js_1 = require("discord.js");
 const dotenv_1 = __importDefault(require("dotenv"));
 const express_1 = __importDefault(require("express"));
-const ws_1 = require("ws");
 const uuid_1 = require("uuid");
+const ws_1 = require("ws");
 const app = (0, express_1.default)();
 dotenv_1.default.config();
 app.use((0, cors_1.default)());
+const activeUsers = {};
 const client = new discord_js_1.Client({
     intents: [discord_js_1.GatewayIntentBits.Guilds, discord_js_1.GatewayIntentBits.GuildPresences],
 });
@@ -74,7 +75,4 @@ wss.on("connection", (ws, req) => {
     const uuid = (0, uuid_1.v4)();
     console.log({ uuid });
     handleDiscordOnConnection(ws);
-});
-app.listen(3001, () => {
-    console.log("Server is running on port 3001");
 });

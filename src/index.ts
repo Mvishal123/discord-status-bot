@@ -10,11 +10,18 @@ dotenv.config();
 app.use(cors());
 
 type UserDetails = {
-  ws: WebSocket;
+  id: string;
   message: String[];
 };
 
-const activeUsers: Record<string, UserDetails> = {};
+type Message = {
+  message: string;
+  userId: string;
+  timestamp: Date;
+};
+
+let users: Record<string, UserDetails> = {};
+let messages: Message[] = [];
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildPresences],
@@ -24,6 +31,8 @@ client.once("ready", () => {
   console.log("Discord bot is ready!");
   checkUserStatus();
 });
+
+client.login(process.env.DISCORD_TOKEN);
 
 let user: Record<string, string | boolean> = {};
 let activity = null;
@@ -51,18 +60,10 @@ async function checkUserStatus() {
   }
 }
 
-const logWs = (ws: WebSocket) => {
-  wss.clients.forEach((client) => {
-    if (client == ws) {
-      console.log(`${client}`);
-    }
-  });
-};
-
 const handleDiscordOnConnection = (ws: WebSocket) => {
   ws.send(JSON.stringify({ type: "user_status", user, activity: activity! }));
 
-  client.on("presenceUpdate", async (oldPresence, newPresence) => {
+  client.on("presenceUpdate", async (_oldPresence, newPresence) => {
     user["status"] = newPresence.status || "offline";
     const activity = newPresence.activities[0];
 
@@ -70,13 +71,66 @@ const handleDiscordOnConnection = (ws: WebSocket) => {
   });
 };
 
-client.login(process.env.DISCORD_TOKEN);
+const sendUserCount = () => {
+  wss.clients.forEach((client) => {
+    const len = { count: Object.keys(users).length, type: "user_count" };
+    client.send(JSON.stringify(len));
+  });
+};
+
+const broadcastMessage = () => {
+  wss.clients.forEach((client) => {
+    const msgResponse = {
+      type: "messages",
+      messages,
+    };
+    client.send(JSON.stringify(msgResponse));
+  });
+};
+
+const handleUserConnection = (ws: WebSocket) => {
+  const uuid = uuidv4();
+  users[uuid] = {
+    id: uuid,
+    message: [],
+  };
+
+  const response = {
+    id: uuid,
+    type: "user_id",
+  };
+
+  ws.send(JSON.stringify(response));
+  sendUserCount();
+
+  ws.on("message", (data: any) => {
+    data = JSON.parse(data);
+
+    switch (data.type) {
+      case "send_message":
+        const { message, timestamp, id } = data;
+        messages.push({ message, timestamp, userId: id });
+        broadcastMessage();
+        break;
+      default:
+        break;
+    }
+  });
+
+  ws.on("close", () => {
+    delete users[uuid];
+    console.log(`User with ID ${uuid} disconnected.`);
+    sendUserCount();
+
+    if (!Object.keys(users).length) {
+      messages = [];
+    }
+  });
+};
 
 const wss = new WebSocketServer({ server: app.listen(8080) });
 
 wss.on("connection", (ws: WebSocket, req) => {
-  const uuid = uuidv4();
-  console.log({ uuid });
-
   handleDiscordOnConnection(ws);
+  handleUserConnection(ws);
 });

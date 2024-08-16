@@ -21,7 +21,8 @@ const ws_1 = require("ws");
 const app = (0, express_1.default)();
 dotenv_1.default.config();
 app.use((0, cors_1.default)());
-const activeUsers = {};
+let users = {};
+let messages = [];
 const client = new discord_js_1.Client({
     intents: [discord_js_1.GatewayIntentBits.Guilds, discord_js_1.GatewayIntentBits.GuildPresences],
 });
@@ -29,6 +30,7 @@ client.once("ready", () => {
     console.log("Discord bot is ready!");
     checkUserStatus();
 });
+client.login(process.env.DISCORD_TOKEN);
 let user = {};
 let activity = null;
 function checkUserStatus() {
@@ -54,25 +56,64 @@ function checkUserStatus() {
         }
     });
 }
-const logWs = (ws) => {
-    wss.clients.forEach((client) => {
-        if (client == ws) {
-            console.log(`${client}`);
-        }
-    });
-};
 const handleDiscordOnConnection = (ws) => {
     ws.send(JSON.stringify({ type: "user_status", user, activity: activity }));
-    client.on("presenceUpdate", (oldPresence, newPresence) => __awaiter(void 0, void 0, void 0, function* () {
+    client.on("presenceUpdate", (_oldPresence, newPresence) => __awaiter(void 0, void 0, void 0, function* () {
         user["status"] = newPresence.status || "offline";
         const activity = newPresence.activities[0];
         ws.send(JSON.stringify({ type: "user_activity", activity, user }));
     }));
 };
-client.login(process.env.DISCORD_TOKEN);
+const sendUserCount = () => {
+    wss.clients.forEach((client) => {
+        const len = { count: Object.keys(users).length, type: "user_count" };
+        client.send(JSON.stringify(len));
+    });
+};
+const broadcastMessage = () => {
+    wss.clients.forEach((client) => {
+        const msgResponse = {
+            type: "messages",
+            messages,
+        };
+        client.send(JSON.stringify(msgResponse));
+    });
+};
+const handleUserConnection = (ws) => {
+    const uuid = (0, uuid_1.v4)();
+    users[uuid] = {
+        id: uuid,
+        message: [],
+    };
+    const response = {
+        id: uuid,
+        type: "user_id",
+    };
+    ws.send(JSON.stringify(response));
+    sendUserCount();
+    ws.on("message", (data) => {
+        data = JSON.parse(data);
+        switch (data.type) {
+            case "send_message":
+                const { message, timestamp, id } = data;
+                messages.push({ message, timestamp, userId: id });
+                broadcastMessage();
+                break;
+            default:
+                break;
+        }
+    });
+    ws.on("close", () => {
+        delete users[uuid];
+        console.log(`User with ID ${uuid} disconnected.`);
+        sendUserCount();
+        if (!Object.keys(users).length) {
+            messages = [];
+        }
+    });
+};
 const wss = new ws_1.WebSocketServer({ server: app.listen(8080) });
 wss.on("connection", (ws, req) => {
-    const uuid = (0, uuid_1.v4)();
-    console.log({ uuid });
     handleDiscordOnConnection(ws);
+    handleUserConnection(ws);
 });

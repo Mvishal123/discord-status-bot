@@ -12,16 +12,24 @@ app.use(cors());
 type UserDetails = {
   id: string;
   message: String[];
+  color: string;
 };
 
 type Message = {
   message: string;
-  userId: string;
-  timestamp: Date;
+  id: string;
+  date: Date;
+  color: string;
 };
 
 let users: Record<string, UserDetails> = {};
 let messages: Message[] = [];
+
+// Pool of bright colors
+const brightColors = [
+  "#FF5733", "#33FF57", "#3357FF", "#FF33A6", "#FF9633", 
+  "#B833FF", "#33FFF3", "#FFEB33", "#FF33B5", "#33FF6E"
+];
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildPresences],
@@ -90,16 +98,25 @@ const broadcastMessage = () => {
 
 const handleUserConnection = (ws: WebSocket) => {
   const uuid = uuidv4();
+  const color = brightColors.pop() || "#000000"; 
+
   users[uuid] = {
     id: uuid,
     message: [],
+    color, 
   };
 
   const response = {
     id: uuid,
     type: "user_id",
+    color,
   };
 
+  const msgResponse = {
+    type: "messages",
+    messages,
+  };
+  ws.send(JSON.stringify(msgResponse));
   ws.send(JSON.stringify(response));
   sendUserCount();
 
@@ -108,8 +125,8 @@ const handleUserConnection = (ws: WebSocket) => {
 
     switch (data.type) {
       case "send_message":
-        const { message, timestamp, id } = data;
-        messages.push({ message, timestamp, userId: id });
+        const { message, date, id, color} = data;
+        messages.push({ message, date, id, color });
         broadcastMessage();
         break;
       default:
@@ -119,9 +136,12 @@ const handleUserConnection = (ws: WebSocket) => {
 
   ws.on("close", () => {
     delete users[uuid];
-    console.log(`User with ID ${uuid} disconnected.`);
+    brightColors.push(color);
     sendUserCount();
-
+    if (Object.keys(users).length === 1) {
+      messages = [];
+      broadcastMessage();
+    }
     if (!Object.keys(users).length) {
       messages = [];
     }

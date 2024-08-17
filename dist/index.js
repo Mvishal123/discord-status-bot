@@ -23,6 +23,11 @@ dotenv_1.default.config();
 app.use((0, cors_1.default)());
 let users = {};
 let messages = [];
+// Pool of bright colors
+const brightColors = [
+    "#FF5733", "#33FF57", "#3357FF", "#FF33A6", "#FF9633",
+    "#B833FF", "#33FFF3", "#FFEB33", "#FF33B5", "#33FF6E"
+];
 const client = new discord_js_1.Client({
     intents: [discord_js_1.GatewayIntentBits.Guilds, discord_js_1.GatewayIntentBits.GuildPresences],
 });
@@ -81,22 +86,30 @@ const broadcastMessage = () => {
 };
 const handleUserConnection = (ws) => {
     const uuid = (0, uuid_1.v4)();
+    const color = brightColors.pop() || "#000000";
     users[uuid] = {
         id: uuid,
         message: [],
+        color,
     };
     const response = {
         id: uuid,
         type: "user_id",
+        color,
     };
+    const msgResponse = {
+        type: "messages",
+        messages,
+    };
+    ws.send(JSON.stringify(msgResponse));
     ws.send(JSON.stringify(response));
     sendUserCount();
     ws.on("message", (data) => {
         data = JSON.parse(data);
         switch (data.type) {
             case "send_message":
-                const { message, timestamp, id } = data;
-                messages.push({ message, timestamp, userId: id });
+                const { message, date, id, color } = data;
+                messages.push({ message, date, id, color });
                 broadcastMessage();
                 break;
             default:
@@ -105,8 +118,12 @@ const handleUserConnection = (ws) => {
     });
     ws.on("close", () => {
         delete users[uuid];
-        console.log(`User with ID ${uuid} disconnected.`);
+        brightColors.push(color);
         sendUserCount();
+        if (Object.keys(users).length === 1) {
+            messages = [];
+            broadcastMessage();
+        }
         if (!Object.keys(users).length) {
             messages = [];
         }

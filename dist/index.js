@@ -25,8 +25,16 @@ let users = {};
 let messages = [];
 // Pool of bright colors
 const brightColors = [
-    "#FF5733", "#33FF57", "#3357FF", "#FF33A6", "#FF9633",
-    "#B833FF", "#33FFF3", "#FFEB33", "#FF33B5", "#33FF6E"
+    "#FF5733",
+    "#33FF57",
+    "#3357FF",
+    "#FF33A6",
+    "#FF9633",
+    "#B833FF",
+    "#33FFF3",
+    "#FFEB33",
+    "#FF33B5",
+    "#33FF6E",
 ];
 const client = new discord_js_1.Client({
     intents: [discord_js_1.GatewayIntentBits.Guilds, discord_js_1.GatewayIntentBits.GuildPresences],
@@ -76,9 +84,13 @@ const sendUserCount = () => {
     });
 };
 const broadcastMessage = () => {
+    var _a, _b;
+    const sentBy = (_b = (_a = messages[0]) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : "0";
+    console.log({ sentBy });
     wss.clients.forEach((client) => {
         const msgResponse = {
             type: "messages",
+            sentBy,
             messages,
         };
         client.send(JSON.stringify(msgResponse));
@@ -109,7 +121,7 @@ const handleUserConnection = (ws) => {
         switch (data.type) {
             case "send_message":
                 const { message, date, id, color } = data;
-                messages.push({ message, date, id, color });
+                messages = [{ message, date, id, color }, ...messages];
                 broadcastMessage();
                 break;
             default:

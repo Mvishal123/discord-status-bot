@@ -27,8 +27,16 @@ let messages: Message[] = [];
 
 // Pool of bright colors
 const brightColors = [
-  "#FF5733", "#33FF57", "#3357FF", "#FF33A6", "#FF9633", 
-  "#B833FF", "#33FFF3", "#FFEB33", "#FF33B5", "#33FF6E"
+  "#FF5733",
+  "#33FF57",
+  "#3357FF",
+  "#FF33A6",
+  "#FF9633",
+  "#B833FF",
+  "#33FFF3",
+  "#FFEB33",
+  "#FF33B5",
+  "#33FF6E",
 ];
 
 const client = new Client({
@@ -87,9 +95,13 @@ const sendUserCount = () => {
 };
 
 const broadcastMessage = () => {
+  const sentBy = messages[0]?.id ?? "0";
+  console.log({ sentBy });
+
   wss.clients.forEach((client) => {
     const msgResponse = {
       type: "messages",
+      sentBy,
       messages,
     };
     client.send(JSON.stringify(msgResponse));
@@ -98,12 +110,12 @@ const broadcastMessage = () => {
 
 const handleUserConnection = (ws: WebSocket) => {
   const uuid = uuidv4();
-  const color = brightColors.pop() || "#000000"; 
+  const color = brightColors.pop() || "#000000";
 
   users[uuid] = {
     id: uuid,
     message: [],
-    color, 
+    color,
   };
 
   const response = {
@@ -125,10 +137,11 @@ const handleUserConnection = (ws: WebSocket) => {
 
     switch (data.type) {
       case "send_message":
-        const { message, date, id, color} = data;
-        messages.push({ message, date, id, color });
+        const { message, date, id, color } = data;
+        messages = [{ message, date, id, color }, ...messages];
         broadcastMessage();
         break;
+
       default:
         break;
     }
